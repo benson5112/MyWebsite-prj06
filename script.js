@@ -70,6 +70,9 @@ const plantEmoji = plant.querySelector(".plant-emoji");
 const plantLabel = document.getElementById("plantLabel");
 const startButtonContainer = document.getElementById("startButtonContainer");
 const startButton = document.getElementById("startButton");
+const countdownOverlay = document.getElementById("countdownOverlay");
+const warningText = document.getElementById("warningText");
+const countdownNumber = document.getElementById("countdownNumber");
 const resetButton = document.getElementById("resetButton");
 const soundToggleButton = document.getElementById("soundToggleButton");
 const difficultyButtons = document.querySelectorAll(".difficulty-button");
@@ -87,7 +90,9 @@ let timeLeft = difficultySettings[currentDifficulty].timeLimit;
 let timerInterval = null;
 let spawnInterval = null;
 let activeTimeouts = [];
+let countdownTimeouts = [];
 let gameRunning = false;
+let countdownRunning = false;
 let comboCount = 0;
 let reachedMilestones = new Set();
 let soundEnabled = true;
@@ -110,7 +115,7 @@ const sounds = Object.fromEntries(
 
 resetGame();
 
-startButton.addEventListener("click", startGame);
+startButton.addEventListener("click", handleStartButtonClick);
 resetButton.addEventListener("click", resetGame);
 playAgainButton.addEventListener("click", resetGame);
 closeModalButton.addEventListener("click", closeResultModal);
@@ -147,7 +152,7 @@ function updateDifficultyDisplay() {
     const isSelected = button.dataset.difficulty === currentDifficulty;
     button.classList.toggle("selected", isSelected);
     button.setAttribute("aria-pressed", String(isSelected));
-    button.disabled = false;
+    button.disabled = gameRunning || countdownRunning;
   });
 
   difficultyDisplay.innerHTML = `Difficulty:<span class="difficulty-value">${settings.label}</span>`;
@@ -155,13 +160,16 @@ function updateDifficultyDisplay() {
 }
 
 function resetGame() {
+  countdownRunning = false;
+  gameRunning = false;
+  clearCountdownTimers();
   clearGameTimers();
   clearGameObjects();
+  hideCountdownOverlay();
   closeResultModal();
 
   score = 0;
   timeLeft = getCurrentSettings().timeLimit;
-  gameRunning = false;
   comboCount = 0;
   reachedMilestones = new Set();
   milestoneMessageActive = false;
@@ -175,12 +183,20 @@ function resetGame() {
   startButton.disabled = false;
 }
 
-function startGame() {
-  if (gameRunning) {
+function handleStartButtonClick() {
+  if (gameRunning || countdownRunning) {
     return;
   }
 
+  prepareGameForStart();
+  runPreGameCountdown();
+}
+
+function prepareGameForStart() {
+  countdownRunning = true;
+  gameRunning = false;
   clearGameTimers();
+  clearCountdownTimers();
   clearGameObjects();
   closeResultModal();
 
@@ -189,19 +205,62 @@ function startGame() {
   comboCount = 0;
   reachedMilestones = new Set();
   milestoneMessageActive = false;
-  gameRunning = true;
 
   resetPlant();
   updateStatsDisplay();
   updateDifficultyDisplay();
-  showFeedback(MESSAGES.start, "info", 0);
+  showFeedback("Get ready! Watch out for dirty water.", "warning", 0);
 
   startButtonContainer.classList.add("hidden");
   startButton.disabled = true;
+}
+
+function runPreGameCountdown() {
+  showCountdownOverlay("Warning: Don’t touch dirty water!", "");
+
+  setCountdownTimeout(() => showCountdownOverlay("Warning: Don’t touch dirty water!", "3"), 1500);
+  setCountdownTimeout(() => showCountdownOverlay("Warning: Don’t touch dirty water!", "2"), 2500);
+  setCountdownTimeout(() => showCountdownOverlay("Warning: Don’t touch dirty water!", "1"), 3500);
+  setCountdownTimeout(() => showCountdownOverlay("", "Go!"), 4500);
+  setCountdownTimeout(beginActiveGameplay, 5000);
+}
+
+function beginActiveGameplay() {
+  if (!countdownRunning) {
+    return;
+  }
+
+  countdownRunning = false;
+  gameRunning = true;
+  hideCountdownOverlay();
+  updateDifficultyDisplay();
+  showFeedback(MESSAGES.start, "info", 0);
 
   timerInterval = setInterval(updateTimer, 1000);
   scheduleSpawning();
   spawnGameObject();
+}
+
+function showCountdownOverlay(warningMessage, countdownMessage) {
+  warningText.textContent = warningMessage;
+  countdownNumber.textContent = countdownMessage;
+  countdownOverlay.hidden = false;
+}
+
+function hideCountdownOverlay() {
+  warningText.textContent = "Warning: Don’t touch dirty water!";
+  countdownNumber.textContent = "";
+  countdownOverlay.hidden = true;
+}
+
+function setCountdownTimeout(callback, delay) {
+  const timeoutId = setTimeout(() => {
+    countdownTimeouts = countdownTimeouts.filter((id) => id !== timeoutId);
+    callback();
+  }, delay);
+
+  countdownTimeouts.push(timeoutId);
+  return timeoutId;
 }
 
 function updateTimer() {
@@ -565,6 +624,11 @@ function clearGameTimers() {
   activeTimeouts = [];
   clearTimeout(feedbackTimeout);
   feedbackTimeout = null;
+}
+
+function clearCountdownTimers() {
+  countdownTimeouts.forEach((timeoutId) => clearTimeout(timeoutId));
+  countdownTimeouts = [];
 }
 
 function clearGameObjects() {
