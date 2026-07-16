@@ -28,7 +28,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Libre Baskerville", Georgia, "Times New Roman", serif;
   color: var(--dark-navy);
   background:
     radial-gradient(circle at top left, rgba(139, 211, 255, 0.45), transparent 30%),
@@ -77,20 +77,106 @@ body {
 h1 {
   margin: 0;
   font-size: clamp(2.2rem, 7vw, 4.5rem);
+  font-weight: 800;
   line-height: 1;
 }
 
 .subtitle {
   margin: 10px 0 0;
   font-size: clamp(1rem, 3vw, 1.25rem);
+  font-weight: 600;
+}
+
+.mission-prompt {
+  max-width: 520px;
+  margin: 10px auto 0;
+  font-weight: 700;
+}
+
+.difficulty-panel {
+  margin: 20px auto 8px;
+  padding: 16px;
+  border: 3px dashed var(--dark-navy);
+  border-radius: 18px;
+  background: #fff8d8;
+}
+
+.difficulty-panel h2,
+.mission-section h2 {
+  margin: 0 0 12px;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.difficulty-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.difficulty-button {
+  min-width: 120px;
+  padding: 12px 18px;
+  border: 3px solid var(--dark-navy);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--dark-navy);
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.difficulty-button::after {
+  content: "";
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.difficulty-button[data-difficulty="easy"]::after {
+  content: "40s • 8 pts";
+}
+
+.difficulty-button[data-difficulty="normal"]::after {
+  content: "30s • 10 pts";
+}
+
+.difficulty-button[data-difficulty="hard"]::after {
+  content: "25s • 15 pts";
+}
+
+.difficulty-button.selected {
+  background: var(--charity-yellow);
+  box-shadow: 0 5px 0 var(--dark-navy);
+}
+
+.difficulty-button.selected::before {
+  content: "✓ ";
+}
+
+.difficulty-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 .stats-panel {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(130px, 1fr));
   gap: 12px;
-  justify-content: center;
-  flex-wrap: wrap;
-  margin: 20px 0 12px;
+  max-width: 620px;
+  margin: 20px auto 12px;
+}
+
+.stats-panel #difficultyDisplay {
+  grid-column: 2;
+}
+
+.difficulty-value {
+  display: block;
+  margin-top: 4px;
 }
 
 .stat-box {
@@ -107,6 +193,20 @@ h1 {
   min-height: 28px;
   margin: 8px 0 14px;
   font-weight: bold;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.feedback-text.positive {
+  color: #0f7d3b;
+}
+
+.feedback-text.warning {
+  color: #a12b20;
+}
+
+.feedback-text.milestone {
+  color: var(--dark-navy);
+  animation: milestonePulse 0.65s ease;
 }
 
 .game-area {
@@ -173,6 +273,7 @@ h1 {
   cursor: pointer;
   animation: popIn 0.2s ease, floatDrop 1.6s ease-in-out infinite alternate;
   z-index: 2;
+  font-family: inherit;
 }
 
 .water-drop::after {
@@ -222,6 +323,14 @@ h1 {
   transform: rotate(-45deg) scale(1.12);
 }
 
+.water-drop:focus-visible,
+.game-button:focus-visible,
+.difficulty-button:focus-visible,
+.mission-links a:focus-visible {
+  outline: 4px solid var(--charity-blue);
+  outline-offset: 4px;
+}
+
 .water-drop.jerry-can:hover,
 .water-drop.jerry-can:focus {
   transform: translateY(-3px) scale(1.08);
@@ -233,6 +342,41 @@ h1 {
 
 .water-drop.jerry-can:active {
   transform: translateY(2px) scale(0.96);
+}
+
+.water-drop.collected {
+  pointer-events: none;
+  animation: collectPop 0.28s ease forwards;
+}
+
+.water-drop.jerry-can.collected {
+  animation: collectCanPop 0.28s ease forwards;
+}
+
+.water-drop.warning {
+  pointer-events: none;
+  animation: dirtyShake 0.28s ease forwards;
+}
+
+.floating-score {
+  position: absolute;
+  z-index: 6;
+  padding: 3px 8px;
+  border: 2px solid var(--dark-navy);
+  border-radius: 999px;
+  background: var(--white);
+  font-size: 1.15rem;
+  font-weight: 800;
+  pointer-events: none;
+  animation: floatScore 0.85s ease-out forwards;
+}
+
+.floating-score.positive {
+  color: var(--charity-dark-green);
+}
+
+.floating-score.negative {
+  color: var(--charity-red);
 }
 
 .button-row {
@@ -257,6 +401,7 @@ h1 {
   padding: 13px 22px;
   border: 3px solid var(--dark-navy);
   border-radius: 999px;
+  font-family: inherit;
   font-size: 1rem;
   font-weight: bold;
   cursor: pointer;
@@ -287,6 +432,15 @@ h1 {
 .reset-button {
   background: var(--dark-navy);
   color: var(--white);
+}
+
+.sound-button {
+  background: var(--white);
+  color: var(--dark-navy);
+}
+
+.sound-button.muted {
+  background: var(--soft-gray);
 }
 
 .game-button:hover,
@@ -381,6 +535,109 @@ h1 {
   margin-top: 0;
 }
 
+.mission-section {
+  margin-top: 22px;
+  padding: 18px;
+  border: 3px solid var(--dark-navy);
+  border-radius: 18px;
+  background: var(--charity-yellow);
+  color: var(--dark-navy);
+}
+
+.mission-section p {
+  max-width: 590px;
+  margin: 0 auto 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.mission-links {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mission-links a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 3px solid var(--dark-navy);
+  border-radius: 999px;
+  background: var(--dark-navy);
+  color: var(--white);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.mission-links a:hover,
+.mission-links a:focus {
+  background: var(--white);
+  color: var(--dark-navy);
+}
+
+@keyframes collectPop {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.45) rotate(-45deg);
+  }
+}
+
+@keyframes collectCanPop {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}
+
+@keyframes dirtyShake {
+  0%, 100% {
+    opacity: 1;
+    transform: rotate(-45deg) translateX(0);
+  }
+  25% {
+    transform: rotate(-45deg) translateX(-7px);
+  }
+  50% {
+    transform: rotate(-45deg) translateX(7px);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes floatScore {
+  from {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -42px);
+  }
+}
+
+@keyframes milestonePulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 @keyframes modalPop {
   from {
     opacity: 0;
@@ -441,10 +698,18 @@ h1 {
   }
 
   .stat-box {
-    flex: 1 1 120px;
     min-width: 0;
     padding: 10px;
     font-size: 1rem;
+  }
+
+  .stats-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: none;
+  }
+
+  .stats-panel #difficultyDisplay {
+    grid-column: auto;
   }
 
   .water-drop {
@@ -469,6 +734,11 @@ h1 {
     width: 100%;
   }
 
+  .difficulty-button {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
   .start-button-container {
     width: 82%;
   }
@@ -486,5 +756,20 @@ h1 {
 
   .result-modal {
     padding: 20px;
+  }
+
+  .mission-links a {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

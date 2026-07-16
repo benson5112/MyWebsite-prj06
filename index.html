@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Resurrection W: Save the Plant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,11 +17,23 @@
         <p class="brand-label">charity: water inspired prototype</p>
         <h1 id="game-title">Resurrection W</h1>
         <p class="subtitle">Collect clean water to help the plant grow.</p>
+        <p class="mission-prompt">Collect clean water and help the dry plant grow before time runs out.</p>
       </header>
+
+      <section class="difficulty-panel" aria-labelledby="difficultyTitle">
+        <h2 id="difficultyTitle">Choose Difficulty</h2>
+        <div class="difficulty-buttons" role="group" aria-label="Difficulty options">
+          <button id="easyButton" class="difficulty-button" type="button" data-difficulty="easy" aria-pressed="false">Easy</button>
+          <button id="normalButton" class="difficulty-button selected" type="button" data-difficulty="normal" aria-pressed="true">Normal</button>
+          <button id="hardButton" class="difficulty-button" type="button" data-difficulty="hard" aria-pressed="false">Hard</button>
+        </div>
+      </section>
 
       <section class="stats-panel" aria-label="Game stats">
         <div id="scoreDisplay" class="stat-box">Score: 0</div>
         <div id="timerDisplay" class="stat-box">Time: 30</div>
+        <div id="targetDisplay" class="stat-box">Target: 10</div>
+        <div id="difficultyDisplay" class="stat-box">Difficulty:<span class="difficulty-value">Normal</span></div>
       </section>
 
       <p id="feedbackText" class="feedback-text" aria-live="polite">Click clean water drops!</p>
@@ -37,7 +52,17 @@
 
       <div class="button-row">
         <button id="resetButton" class="game-button reset-button" type="button">Reset Game</button>
+        <button id="soundToggleButton" class="game-button sound-button" type="button" aria-pressed="true">Sound: On</button>
       </div>
+
+      <footer class="mission-section" aria-labelledby="missionTitle">
+        <h2 id="missionTitle">Clean Water Mission</h2>
+        <p>Resurrection W is inspired by charity: water’s mission to bring clean and safe water to people around the world.</p>
+        <div class="mission-links">
+          <a href="https://www.charitywater.org/" target="_blank" rel="noopener noreferrer">Learn About charity: water</a>
+          <a href="https://www.charitywater.org/donate" target="_blank" rel="noopener noreferrer">Donate Clean Water</a>
+        </div>
+      </footer>
     </section>
   </main>
 

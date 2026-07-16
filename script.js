@@ -1,30 +1,68 @@
 /*
   Resurrection W: Save the Plant
-  Beginner-friendly JavaScript game logic.
-
-  Customize game settings here:
+  Plain JavaScript game logic for difficulty, scoring, milestones, modal, and sounds.
 */
-const SCORE_GOAL = 10;
-const START_TIME = 30;
-const NORMAL_DROP_SPEED = 900; // score 0-4
-const FAST_DROP_SPEED = 700; // score 5-7
-const FASTEST_DROP_SPEED = 550; // score 8+
+const difficultySettings = {
+  easy: {
+    label: "Easy",
+    timeLimit: 40,
+    targetScore: 8,
+    spawnInterval: 1000,
+    dirtyWaterChance: 0.15
+  },
+  normal: {
+    label: "Normal",
+    timeLimit: 30,
+    targetScore: 10,
+    spawnInterval: 750,
+    dirtyWaterChance: 0.25
+  },
+  hard: {
+    label: "Hard",
+    timeLimit: 25,
+    targetScore: 15,
+    spawnInterval: 500,
+    dirtyWaterChance: 0.35
+  }
+};
 
-// Customize messages here.
+const milestones = [
+  {
+    percent: 0.25,
+    message: "Great start! Clean water is on the way!"
+  },
+  {
+    percent: 0.5,
+    message: "Halfway there! Keep collecting clean water!"
+  },
+  {
+    percent: 0.75,
+    message: "Almost there! The plant is waiting!"
+  }
+];
+
 const MESSAGES = {
   start: "Click clean water drops!",
-  ready: "Press Start to begin!",
+  ready: "Choose a difficulty, then press Start to begin!",
   clean: "Great! Clean water helps the plant grow. +1",
   jerryCan: "Jerry Can bonus! +3",
   dirty: "Dirty water! -1",
   combo: "Combo! Keep the clean water coming!",
-  win: "You saved the plant!",
-  lose: "Time is up! Try again to bring clean water."
+  win: "You saved the plant! Clean water helps communities grow, learn, and stay healthy.",
+  lose: "Time is up! Try again to bring clean water. Every drop matters."
 };
 
-// Get important HTML elements.
+const soundFiles = {
+  clean: "sounds/clean-water.wav",
+  jerryCan: "sounds/jerry-can-bonus.wav",
+  dirty: "sounds/dirty-water-warning.wav",
+  win: "sounds/win.wav"
+};
+
 const scoreDisplay = document.getElementById("scoreDisplay");
 const timerDisplay = document.getElementById("timerDisplay");
+const targetDisplay = document.getElementById("targetDisplay");
+const difficultyDisplay = document.getElementById("difficultyDisplay");
 const feedbackText = document.getElementById("feedbackText");
 const gameArea = document.getElementById("gameArea");
 const plant = document.getElementById("plant");
@@ -33,6 +71,8 @@ const plantLabel = document.getElementById("plantLabel");
 const startButtonContainer = document.getElementById("startButtonContainer");
 const startButton = document.getElementById("startButton");
 const resetButton = document.getElementById("resetButton");
+const soundToggleButton = document.getElementById("soundToggleButton");
+const difficultyButtons = document.querySelectorAll(".difficulty-button");
 const resultOverlay = document.getElementById("resultOverlay");
 const resultTitle = document.getElementById("resultTitle");
 const starRating = document.getElementById("starRating");
@@ -41,46 +81,96 @@ const resultMessage = document.getElementById("resultMessage");
 const playAgainButton = document.getElementById("playAgainButton");
 const closeModalButton = document.getElementById("closeModalButton");
 
-// Track game state.
+let currentDifficulty = "normal";
 let score = 0;
-let timeLeft = START_TIME;
-let timerInterval;
-let dropInterval;
+let timeLeft = difficultySettings[currentDifficulty].timeLimit;
+let timerInterval = null;
+let spawnInterval = null;
+let activeTimeouts = [];
 let gameRunning = false;
-let currentDropSpeed = NORMAL_DROP_SPEED;
 let comboCount = 0;
+let reachedMilestones = new Set();
+let soundEnabled = true;
+let lastFocusedElement = null;
+let feedbackTimeout = null;
+let milestoneMessageActive = false;
 
-// Show the ready screen when the page loads. The game does not start yet.
-showStartState();
+const sounds = Object.fromEntries(
+  Object.entries(soundFiles).map(([name, src]) => {
+    const audio = new Audio(src);
+    audio.preload = "auto";
+    audio.muted = false;
+    audio.volume = 1;
+    audio.addEventListener("error", () => {
+      console.warn(`Sound file could not be loaded: ${src}`);
+    });
+    return [name, audio];
+  })
+);
 
-// Button controls.
+resetGame();
+
 startButton.addEventListener("click", startGame);
-resetButton.addEventListener("click", showStartState);
-playAgainButton.addEventListener("click", showStartState);
+resetButton.addEventListener("click", resetGame);
+playAgainButton.addEventListener("click", resetGame);
 closeModalButton.addEventListener("click", closeResultModal);
+soundToggleButton.addEventListener("click", toggleSound);
 
-function showStartState() {
-  score = 0;
-  timeLeft = START_TIME;
-  gameRunning = false;
-  comboCount = 0;
-  currentDropSpeed = NORMAL_DROP_SPEED;
+difficultyButtons.forEach((button) => {
+  button.addEventListener("click", () => selectDifficulty(button.dataset.difficulty));
+});
 
-  clearInterval(timerInterval);
-  clearInterval(dropInterval);
-  clearDrops();
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !resultOverlay.classList.contains("hidden")) {
+    closeResultModal();
+  }
+});
+
+function getCurrentSettings() {
+  return difficultySettings[currentDifficulty];
+}
+
+function selectDifficulty(level) {
+  if (!difficultySettings[level]) {
+    return;
+  }
+
+  currentDifficulty = level;
+  resetGame();
+  showFeedback(`${getCurrentSettings().label} mode selected. Target: ${getCurrentSettings().targetScore} points.`, "info", 0);
+}
+
+function updateDifficultyDisplay() {
+  const settings = getCurrentSettings();
+
+  difficultyButtons.forEach((button) => {
+    const isSelected = button.dataset.difficulty === currentDifficulty;
+    button.classList.toggle("selected", isSelected);
+    button.setAttribute("aria-pressed", String(isSelected));
+    button.disabled = false;
+  });
+
+  difficultyDisplay.innerHTML = `Difficulty:<span class="difficulty-value">${settings.label}</span>`;
+  targetDisplay.textContent = `Target: ${settings.targetScore}`;
+}
+
+function resetGame() {
+  clearGameTimers();
+  clearGameObjects();
   closeResultModal();
 
-  scoreDisplay.textContent = `Score: ${score}`;
-  timerDisplay.textContent = `Time: ${timeLeft}`;
-  feedbackText.textContent = MESSAGES.ready;
+  score = 0;
+  timeLeft = getCurrentSettings().timeLimit;
+  gameRunning = false;
+  comboCount = 0;
+  reachedMilestones = new Set();
+  milestoneMessageActive = false;
 
-  plant.className = "plant dry";
-  plant.setAttribute("aria-label", "Dry plant");
-  plantEmoji.textContent = "🥀";
-  plantLabel.textContent = "Dry plant";
+  updateStatsDisplay();
+  updateDifficultyDisplay();
+  showFeedback(MESSAGES.ready, "info", 0);
+  resetPlant();
 
-  // Show the big centered Start button before the game begins.
   startButtonContainer.classList.remove("hidden");
   startButton.disabled = false;
 }
@@ -90,157 +180,304 @@ function startGame() {
     return;
   }
 
+  clearGameTimers();
+  clearGameObjects();
+  closeResultModal();
+
+  score = 0;
+  timeLeft = getCurrentSettings().timeLimit;
+  comboCount = 0;
+  reachedMilestones = new Set();
+  milestoneMessageActive = false;
   gameRunning = true;
-  feedbackText.textContent = MESSAGES.start;
-  // Hide the Start button so it does not block water drops.
+
+  resetPlant();
+  updateStatsDisplay();
+  updateDifficultyDisplay();
+  showFeedback(MESSAGES.start, "info", 0);
+
   startButtonContainer.classList.add("hidden");
   startButton.disabled = true;
 
   timerInterval = setInterval(updateTimer, 1000);
-  dropInterval = setInterval(createWaterDrop, currentDropSpeed);
-  createWaterDrop();
+  scheduleSpawning();
+  spawnGameObject();
 }
 
 function updateTimer() {
-  timeLeft--;
-  timerDisplay.textContent = `Time: ${timeLeft}`;
+  timeLeft = Math.max(0, timeLeft - 1);
+  updateStatsDisplay();
 
   if (timeLeft <= 0) {
     endGame(false);
   }
 }
 
-function createWaterDrop() {
+function scheduleSpawning() {
+  clearInterval(spawnInterval);
+  spawnInterval = setInterval(spawnGameObject, getAdjustedSpawnInterval());
+}
+
+function getAdjustedSpawnInterval() {
+  const settings = getCurrentSettings();
+  const progress = score / settings.targetScore;
+
+  if (progress >= 0.75) {
+    return Math.max(320, settings.spawnInterval - 220);
+  }
+
+  if (progress >= 0.45) {
+    return Math.max(380, settings.spawnInterval - 120);
+  }
+
+  return settings.spawnInterval;
+}
+
+function spawnGameObject() {
   if (!gameRunning) {
     return;
   }
 
-  const drop = document.createElement("button");
-  const dropType = chooseDropType();
+  const objectType = chooseObjectType();
+  const objectButton = document.createElement("button");
 
-  drop.classList.add("water-drop", dropType);
-  drop.type = "button";
-  drop.setAttribute("aria-label", dropType === "jerry-can" ? "Jerry Can bonus" : `${dropType} water drop`);
+  objectButton.classList.add("water-drop", objectType);
+  objectButton.type = "button";
+  objectButton.dataset.collected = "false";
+  objectButton.setAttribute("aria-label", getObjectLabel(objectType));
 
-  // Jerry Can bonus uses the provided transparent image without recoloring or distortion.
-  if (dropType === "jerry-can") {
+  if (objectType === "jerry-can") {
     const jerryCanImage = document.createElement("img");
     jerryCanImage.src = "png/water-can-transparent.png";
-    jerryCanImage.alt = "Jerry Can bonus";
+    jerryCanImage.alt = "Jerry Can bonus worth 3 points";
     jerryCanImage.classList.add("jerry-can-image");
-    drop.appendChild(jerryCanImage);
+    objectButton.appendChild(jerryCanImage);
   }
 
-  // Keep drops inside the visible game area and away from the plant at the bottom.
-  const dropSize = 52;
-  const maxX = gameArea.clientWidth - dropSize;
-  const maxY = gameArea.clientHeight - 150;
-  drop.style.left = `${randomNumber(8, Math.max(8, maxX))}px`;
-  drop.style.top = `${randomNumber(8, Math.max(8, maxY))}px`;
+  positionGameObject(objectButton, objectType);
+  objectButton.addEventListener("click", () => handleGameObjectClick(objectButton, objectType));
+  gameArea.appendChild(objectButton);
 
-  drop.addEventListener("click", () => handleDropClick(drop, dropType));
-  gameArea.appendChild(drop);
-
-  // Remove old drops if the player does not click them.
-  setTimeout(() => {
-    if (drop.parentElement) {
-      drop.remove();
-    }
-  }, 2200);
+  const removeTimeout = setTrackedTimeout(() => removeElement(objectButton), 2300);
+  objectButton.dataset.timeoutId = String(removeTimeout);
 }
 
-function chooseDropType() {
+function chooseObjectType() {
   const chance = Math.random();
+  const jerryCanChance = 0.15;
 
-  if (chance < 0.15) {
+  if (chance < jerryCanChance) {
     return "jerry-can";
   }
 
-  if (chance < 0.42) {
+  if (chance < jerryCanChance + getCurrentSettings().dirtyWaterChance) {
     return "dirty";
   }
 
   return "clean";
 }
 
-function handleDropClick(drop, dropType) {
-  if (!gameRunning) {
+function getObjectLabel(objectType) {
+  if (objectType === "jerry-can") {
+    return "Jerry Can bonus, plus 3 points";
+  }
+
+  if (objectType === "dirty") {
+    return "Dirty water drop, minus 1 point";
+  }
+
+  return "Clean water drop, plus 1 point";
+}
+
+function positionGameObject(objectButton, objectType) {
+  const objectSize = objectType === "jerry-can" ? 60 : 52;
+  const maxX = Math.max(8, gameArea.clientWidth - objectSize - 8);
+  const maxY = Math.max(8, gameArea.clientHeight - 165);
+
+  objectButton.style.left = `${randomNumber(8, maxX)}px`;
+  objectButton.style.top = `${randomNumber(8, maxY)}px`;
+}
+
+function handleGameObjectClick(objectButton, objectType) {
+  if (!gameRunning || objectButton.dataset.collected === "true") {
     return;
   }
 
-  if (dropType === "clean") {
-    score++;
-    comboCount++;
-    feedbackText.textContent = MESSAGES.clean;
-  } else if (dropType === "jerry-can") {
-    score += 3;
-    comboCount++;
-    feedbackText.textContent = MESSAGES.jerryCan;
+  objectButton.dataset.collected = "true";
+  objectButton.disabled = true;
+
+  if (objectButton.dataset.timeoutId) {
+    clearTimeout(Number(objectButton.dataset.timeoutId));
+  }
+
+  if (objectType === "clean") {
+    handleCleanWaterClick(objectButton);
+  } else if (objectType === "jerry-can") {
+    handleJerryCanClick(objectButton);
   } else {
-    score = Math.max(0, score - 1);
-    comboCount = 0;
-    feedbackText.textContent = MESSAGES.dirty;
+    handleDirtyWaterClick(objectButton);
+  }
+}
+
+function handleCleanWaterClick(objectButton) {
+  updateScore(1);
+  comboCount++;
+  objectButton.classList.add("collected");
+  showFloatingScore(objectButton, "+1", "positive");
+  playSound("clean");
+  showCollectionFeedback(MESSAGES.clean);
+  removeAfterAnimation(objectButton);
+}
+
+function handleJerryCanClick(objectButton) {
+  updateScore(3);
+  comboCount++;
+  objectButton.classList.add("collected");
+  showFloatingScore(objectButton, "+3", "positive");
+  playSound("jerryCan");
+  showCollectionFeedback(MESSAGES.jerryCan);
+  removeAfterAnimation(objectButton);
+}
+
+function handleDirtyWaterClick(objectButton) {
+  updateScore(-1);
+  comboCount = 0;
+  objectButton.classList.add("warning");
+  showFloatingScore(objectButton, "-1", "negative");
+  playSound("dirty");
+  showFeedback(MESSAGES.dirty, "warning");
+  removeAfterAnimation(objectButton);
+}
+
+function showCollectionFeedback(message) {
+  if (milestoneMessageActive) {
+    return;
   }
 
-  if (comboCount >= 3 && dropType !== "dirty") {
-    feedbackText.textContent += ` ${MESSAGES.combo}`;
-  }
+  const comboMessage = comboCount >= 3 ? ` ${MESSAGES.combo}` : "";
+  showFeedback(`${message}${comboMessage}`, "positive");
+}
 
+function updateScore(amount) {
+  score = Math.max(0, score + amount);
+  updateStatsDisplay();
+  checkMilestones();
+  checkWinCondition();
+
+  if (gameRunning) {
+    scheduleSpawning();
+  }
+}
+
+function updateStatsDisplay() {
   scoreDisplay.textContent = `Score: ${score}`;
-  drop.remove();
-  updateDropSpeed();
+  timerDisplay.textContent = `Time: ${timeLeft}`;
+  targetDisplay.textContent = `Target: ${getCurrentSettings().targetScore}`;
+}
 
-  if (score >= SCORE_GOAL) {
+function checkWinCondition() {
+  if (score >= getCurrentSettings().targetScore) {
     endGame(true);
   }
 }
 
+function checkMilestones() {
+  const targetScore = getCurrentSettings().targetScore;
+
+  milestones.forEach((milestone) => {
+    const milestoneScore = Math.ceil(targetScore * milestone.percent);
+
+    if (score >= milestoneScore && !reachedMilestones.has(milestone.percent) && score < targetScore) {
+      reachedMilestones.add(milestone.percent);
+      showFeedback(milestone.message, "milestone", 1800);
+    }
+  });
+}
+
+function showFloatingScore(sourceElement, text, type) {
+  const indicator = document.createElement("span");
+  const sourceRect = sourceElement.getBoundingClientRect();
+  const gameRect = gameArea.getBoundingClientRect();
+
+  indicator.className = `floating-score ${type}`;
+  indicator.textContent = text;
+  indicator.setAttribute("aria-hidden", "true");
+  indicator.style.left = `${Math.min(gameArea.clientWidth - 40, Math.max(8, sourceRect.left - gameRect.left + sourceRect.width / 2))}px`;
+  indicator.style.top = `${Math.max(8, sourceRect.top - gameRect.top)}px`;
+
+  gameArea.appendChild(indicator);
+  setTrackedTimeout(() => removeElement(indicator), 850);
+}
+
+function showFeedback(message, type = "info", minimumDuration = 900) {
+  clearTimeout(feedbackTimeout);
+  feedbackText.textContent = message;
+  feedbackText.className = `feedback-text ${type}`;
+  milestoneMessageActive = type === "milestone";
+
+  if (minimumDuration > 0) {
+    feedbackTimeout = setTrackedTimeout(() => {
+      if (gameRunning && feedbackText.textContent === message) {
+        feedbackText.textContent = MESSAGES.start;
+        feedbackText.className = "feedback-text";
+      }
+
+      if (type === "milestone") {
+        milestoneMessageActive = false;
+      }
+    }, minimumDuration);
+  }
+}
+
 function endGame(playerWon) {
+  if (!gameRunning && resultOverlay.classList.contains("hidden") === false) {
+    return;
+  }
+
   gameRunning = false;
-  clearInterval(timerInterval);
-  clearInterval(dropInterval);
-  clearDrops();
+  clearGameTimers();
+  clearGameObjects();
   startButton.disabled = true;
+  updateDifficultyDisplay();
 
   if (playerWon) {
-    feedbackText.textContent = MESSAGES.win;
-    plant.className = "plant healthy";
-    plant.setAttribute("aria-label", "Healthy saved plant");
-    plantEmoji.textContent = "🌱";
-    plantLabel.textContent = "Plant saved!";
+    showFeedback(MESSAGES.win, "positive", 0);
+    setHealthyPlant();
+    playSound("win");
   } else {
-    feedbackText.textContent = MESSAGES.lose;
+    showFeedback(MESSAGES.lose, "warning", 0);
   }
 
-  showResultModal(playerWon);
+  openResultModal(playerWon);
 }
 
-function updateDropSpeed() {
-  let newSpeed = NORMAL_DROP_SPEED;
-
-  if (score >= 8) {
-    newSpeed = FASTEST_DROP_SPEED;
-  } else if (score >= 5) {
-    newSpeed = FAST_DROP_SPEED;
-  }
-
-  if (newSpeed !== currentDropSpeed) {
-    currentDropSpeed = newSpeed;
-    clearInterval(dropInterval);
-    dropInterval = setInterval(createWaterDrop, currentDropSpeed);
-  }
+function resetPlant() {
+  plant.className = "plant dry";
+  plant.setAttribute("aria-label", "Dry plant");
+  plantEmoji.textContent = "🥀";
+  plantLabel.textContent = "Dry plant";
 }
 
-function showResultModal(playerWon) {
+function setHealthyPlant() {
+  plant.className = "plant healthy";
+  plant.setAttribute("aria-label", "Healthy saved plant");
+  plantEmoji.textContent = "🌱";
+  plantLabel.textContent = "Plant saved!";
+}
+
+function openResultModal(playerWon) {
   const stars = getStarCount();
 
+  lastFocusedElement = document.activeElement;
   resultTitle.textContent = playerWon ? "You Saved the Plant!" : "Round Complete";
   starRating.textContent = "★".repeat(stars) + "☆".repeat(3 - stars);
-  finalScore.textContent = `Final Score: ${score}`;
-  resultMessage.textContent = getRatingMessage(stars);
+  starRating.setAttribute("aria-label", `${stars} out of 3 stars`);
+  finalScore.textContent = `Final Score: ${score} / ${getCurrentSettings().targetScore}`;
+  resultMessage.textContent = getRatingMessage(stars, playerWon);
 
   resultOverlay.classList.remove("hidden");
   resultOverlay.setAttribute("aria-hidden", "false");
+  playAgainButton.focus();
 
   if (stars === 3) {
     celebrate();
@@ -248,57 +485,129 @@ function showResultModal(playerWon) {
 }
 
 function closeResultModal() {
+  const wasOpen = !resultOverlay.classList.contains("hidden");
   resultOverlay.classList.add("hidden");
   resultOverlay.setAttribute("aria-hidden", "true");
+
+  if (wasOpen && lastFocusedElement && typeof lastFocusedElement.focus === "function") {
+    lastFocusedElement.focus();
+  }
 }
 
 function getStarCount() {
-  if (score >= SCORE_GOAL) {
+  const targetScore = getCurrentSettings().targetScore;
+  const percentOfTarget = score / targetScore;
+
+  if (score >= targetScore) {
     return 3;
   }
 
-  if (score >= 8) {
+  if (percentOfTarget >= 0.8) {
     return 2;
   }
 
-  if (score >= 3) {
+  if (percentOfTarget >= 0.3) {
     return 1;
   }
 
   return 0;
 }
 
-function getRatingMessage(stars) {
-  if (stars === 3) {
-    return "Plant saved!";
+function getRatingMessage(stars, playerWon) {
+  if (playerWon || stars === 3) {
+    return "Plant saved! Clean water helps communities grow, learn, and stay healthy.";
   }
 
   if (stars === 2) {
-    return "Almost there!";
+    return "Almost there! Every drop matters.";
   }
 
   if (stars === 1) {
-    return "Keep trying!";
+    return "Keep trying and help bring clean water to the plant.";
   }
 
-  return "Please try again!";
+  return "Please try again! Every drop matters.";
 }
 
-function clearDrops() {
-  const drops = document.querySelectorAll(".water-drop, .confetti");
-  drops.forEach((drop) => drop.remove());
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+  soundToggleButton.textContent = soundEnabled ? "Sound: On" : "Sound: Off";
+  soundToggleButton.setAttribute("aria-pressed", String(soundEnabled));
+  soundToggleButton.classList.toggle("muted", !soundEnabled);
+}
+
+function playSound(soundName) {
+  if (!soundEnabled || !sounds[soundName]) {
+    return;
+  }
+
+  const sound = sounds[soundName];
+  sound.muted = false;
+  sound.volume = 1;
+  sound.pause();
+  sound.currentTime = 0;
+
+  const playPromise = sound.play();
+
+  if (playPromise && typeof playPromise.catch === "function") {
+    playPromise.catch((error) => {
+      console.warn(`Sound could not be played: ${soundFiles[soundName]}`, error);
+    });
+  }
+}
+
+function clearGameTimers() {
+  clearInterval(timerInterval);
+  clearInterval(spawnInterval);
+  timerInterval = null;
+  spawnInterval = null;
+  activeTimeouts.forEach((timeoutId) => clearTimeout(timeoutId));
+  activeTimeouts = [];
+  clearTimeout(feedbackTimeout);
+  feedbackTimeout = null;
+}
+
+function clearGameObjects() {
+  const objects = gameArea.querySelectorAll(".water-drop, .confetti, .floating-score");
+  objects.forEach((object) => object.remove());
+}
+
+function removeAfterAnimation(element) {
+  setTrackedTimeout(() => removeElement(element), 280);
+}
+
+function removeElement(element) {
+  if (element && element.parentElement) {
+    element.remove();
+  }
+}
+
+function setTrackedTimeout(callback, delay) {
+  const timeoutId = setTimeout(() => {
+    activeTimeouts = activeTimeouts.filter((id) => id !== timeoutId);
+    callback();
+  }, delay);
+
+  activeTimeouts.push(timeoutId);
+  return timeoutId;
 }
 
 function celebrate() {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    return;
+  }
+
   const colors = ["#ffc907", "#1ca3ec", "#35a853", "#ffffff", "#111827"];
 
   for (let i = 0; i < 35; i++) {
     const confetti = document.createElement("span");
     confetti.classList.add("confetti");
+    confetti.setAttribute("aria-hidden", "true");
     confetti.style.left = `${randomNumber(0, gameArea.clientWidth)}px`;
     confetti.style.backgroundColor = colors[i % colors.length];
     confetti.style.animationDelay = `${Math.random() * 0.6}s`;
     gameArea.appendChild(confetti);
+    setTrackedTimeout(() => removeElement(confetti), 2600);
   }
 }
 
