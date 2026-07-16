@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resurrection W: Save the Plant</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="page-wrapper">
+    <section class="game-card" aria-labelledby="game-title">
+      <header class="hero">
+        <img src="png/cw_logo_horizontal.png" alt="charity: water logo" class="cw-logo">
+        <p class="brand-label">charity: water inspired prototype</p>
+        <h1 id="game-title">Resurrection W</h1>
+        <p class="subtitle">Collect clean water to help the plant grow.</p>
+      </header>
+
+      <section class="stats-panel" aria-label="Game stats">
+        <div id="scoreDisplay" class="stat-box">Score: 0</div>
+        <div id="timerDisplay" class="stat-box">Time: 30</div>
+      </section>
+
+      <p id="feedbackText" class="feedback-text" aria-live="polite">Click clean water drops!</p>
+
+      <section id="gameArea" class="game-area" aria-label="Water drop game area">
+        <div id="plant" class="plant dry" aria-label="Dry plant">
+          <div class="sun">☀️</div>
+          <div class="plant-emoji">🥀</div>
+          <p id="plantLabel">Dry plant</p>
+        </div>
+
+        <div id="startButtonContainer" class="start-button-container">
+          <button id="startButton" class="game-button start-button big-start-button" type="button">Start Game</button>
+        </div>
+      </section>
+
+      <div class="button-row">
+        <button id="resetButton" class="game-button reset-button" type="button">Reset Game</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="resultOverlay" class="result-overlay hidden" aria-hidden="true">
+    <section class="result-modal" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+      <h2 id="resultTitle">Game Over</h2>
+      <div id="starRating" class="star-rating" aria-label="Star rating">☆☆☆</div>
+      <p id="finalScore" class="final-score">Final Score: 0</p>
+      <p id="resultMessage" class="result-message">Keep trying!</p>
+
+      <div class="modal-buttons">
+        <button id="playAgainButton" class="game-button start-button" type="button">Play Again</button>
+        <button id="closeModalButton" class="game-button reset-button" type="button">Close</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
